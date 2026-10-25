@@ -123,7 +123,8 @@ function spokenNote(s){
 function speak(){
   if(!target) return;
   speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(`String ${target.s.n}. ${spokenNote(target.label)}.`);
+  const stringNames = {1:"high E",2:"B",3:"G",4:"D",5:"A",6:"low E"};
+  const u=new SpeechSynthesisUtterance(`${stringNames[target.s.n]} string. ${spokenNote(target.label)}.`);
   u.lang="en-GB"; u.rate=.88; speechSynthesis.speak(u);
 }
 function nextTarget(){
