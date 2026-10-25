@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FretFlash — Gitaar Notentrainer</title>
+<style>
+:root{--bg:#101114;--card:#1a1c21;--text:#f5f5f5;--muted:#a8abb3;--ok:#39d98a;--bad:#ff647c;--accent:#8ca8ff}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:16px system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:720px;margin:auto;padding:22px 16px 50px}.card{background:var(--card);border-radius:22px;padding:20px;margin:14px 0}
+h1{font-size:28px;margin:4px 0} h2{font-size:18px;margin:0 0 12px}.muted{color:var(--muted)}
+.target{text-align:center;padding:28px 10px}.string{font-size:18px;color:var(--muted)}.note{font-size:70px;font-weight:800;line-height:1.05;margin:10px 0}
+.status{min-height:28px;font-weight:700}.ok{color:var(--ok)}.bad{color:var(--bad)}
+button,select,input{font:inherit}button{border:0;border-radius:14px;padding:13px 18px;font-weight:750;cursor:pointer;background:var(--accent);color:#0c1020}
+button.secondary{background:#2a2d35;color:var(--text)}button:disabled{opacity:.45}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.grow{flex:1}.settings label{display:grid;gap:6px;min-width:145px;flex:1}
+select,input{background:#252830;color:var(--text);border:1px solid #383c46;border-radius:10px;padding:10px}
+.meter{height:9px;background:#2a2d35;border-radius:9px;overflow:hidden;margin-top:10px}.meter>div{height:100%;width:0;background:var(--ok);transition:.08s}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:#24272e;border-radius:14px;padding:12px;text-align:center}.stat b{font-size:22px;display:block}
+.chartWrap{display:flex;gap:20px;align-items:center;flex-wrap:wrap}.donut{width:190px;height:190px;transform:rotate(-90deg)}
+.legend{display:grid;gap:8px}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px 5px;border-bottom:1px solid #30333b}
+small{color:var(--muted)}.pill{display:inline-block;padding:5px 9px;border-radius:99px;background:#262a32;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+  <h1>🎸 FretFlash</h1>
+  <div class="muted">Train snaar + noot, met A–G én do–si notatie.</div>
+
+  <section class="card target">
+    <div id="string" class="string">Druk op Start</div>
+    <div id="note" class="note">♪</div>
+    <div id="accidental" class="muted"></div>
+    <div id="status" class="status"></div>
+    <div class="meter"><div id="meter"></div></div>
+    <div style="margin-top:18px" class="row">
+      <button id="start" class="grow">Start training</button>
+      <button id="repeat" class="secondary" disabled>🔊 Herhaal</button>
+    </div>
+  </section>
+
+  <section class="card settings">
+    <h2>Instellingen</h2>
+    <div class="row">
+      <label>Notatie
+        <select id="notation">
+          <option value="mixed">Wissel A–G / do–si af</option>
+          <option value="letter">Alleen A–G</option>
+          <option value="solfege">Alleen do–si</option>
+        </select>
+      </label>
+      <label>Max. fret
+        <input id="maxFret" type="number" min="1" max="24" value="12">
+      </label>
+      <label>Toonhoogte-tolerantie
+        <select id="tol"><option value="25">Streng (±25 cent)</option><option value="35" selected>Normaal (±35 cent)</option><option value="50">Ruim (±50 cent)</option></select>
+      </label>
+    </div>
+    <small>Stemming: standaard E–A–D–G–B–E. De fret wordt bewust niet getoond: jij zoekt hem zelf.</small>
+  </section>
+
+  <section class="card">
+    <h2>Resultaten</h2>
+    <div class="stats">
+      <div class="stat"><b id="count">0</b><span class="muted">juist</span></div>
+      <div class="stat"><b id="avg">–</b><span class="muted">gemiddeld</span></div>
+      <div class="stat"><b id="best">–</b><span class="muted">beste</span></div>
+    </div>
+    <div class="chartWrap" style="margin-top:18px">
+      <svg class="donut" viewBox="0 0 42 42" aria-label="Cirkelgrafiek reactietijden">
+        <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="#2a2d35" stroke-width="6"/>
+        <circle id="fastArc" cx="21" cy="21" r="15.915" fill="transparent" stroke="#39d98a" stroke-width="6" stroke-dasharray="0 100" stroke-dashoffset="0"/>
+        <circle id="midArc" cx="21" cy="21" r="15.915" fill="transparent" stroke="#ffd166" stroke-width="6" stroke-dasharray="0 100" stroke-dashoffset="0"/>
+        <circle id="slowArc" cx="21" cy="21" r="15.915" fill="transparent" stroke="#ff647c" stroke-width="6" stroke-dasharray="0 100" stroke-dashoffset="0"/>
+      </svg>
+      <div class="legend">
+        <div><span class="dot" style="background:#39d98a"></span>&lt; 3 sec: <b id="fastN">0</b></div>
+        <div><span class="dot" style="background:#ffd166"></span>3–6 sec: <b id="midN">0</b></div>
+        <div><span class="dot" style="background:#ff647c"></span>&gt; 6 sec: <b id="slowN">0</b></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Laatste pogingen</h2>
+    <table><thead><tr><th>Opdracht</th><th>Notatie</th><th>Tijd</th></tr></thead><tbody id="history"><tr><td colspan="3" class="muted">Nog geen resultaten.</td></tr></tbody></table>
+  </section>
+
+  <section class="card">
+    <span class="pill">Belangrijk</span>
+    <p class="muted" style="margin-bottom:0">De microfoon kan de toonhoogte controleren, maar niet fysiek bewijzen welke snaar je aanslaat. De app geeft daarom een verplichte snaar en berekent de juiste fret daarop. Een identieke toonhoogte op een andere snaar kan akoestisch niet betrouwbaar onderscheiden worden zonder extra hardware of cameradetectie.</p>
+  </section>
+</main>
+
+<script>
+const strings = [
+  {n:1,midi:64,name:"hoge E"}, {n:2,midi:59,name:"B"}, {n:3,midi:55,name:"G"},
+  {n:4,midi:50,name:"D"}, {n:5,midi:45,name:"A"}, {n:6,midi:40,name:"lage E"}
+];
+const sharpNames=["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"];
+const flatNames =["C","D♭","D","E♭","E","F","G♭","G","A♭","A","B♭","B"];
+const solSharp=["do","do♯","re","re♯","mi","fa","fa♯","sol","sol♯","la","la♯","si"];
+const solFlat =["do","re♭","re","mi♭","mi","fa","sol♭","sol","la♭","la","si♭","si"];
+let audioCtx, analyser, buf, stream, running=false, target=null, startedAt=0, stable=0, results=[];
+let lastNotation="solfege";
+
+const $=id=>document.getElementById(id);
+function midiFreq(m){return 440*Math.pow(2,(m-69)/12)}
+function cents(freq,m){return 1200*Math.log2(freq/midiFreq(m))}
+function chooseNotation(){
+  const mode=$("notation").value;
+  if(mode!=="mixed") return mode;
+  lastNotation=lastNotation==="letter"?"solfege":"letter";
+  return lastNotation;
+}
+function labelFor(pc, notation, useFlat){
+  return notation==="letter" ? (useFlat?flatNames:sharpNames)[pc] : (useFlat?solFlat:solSharp)[pc];
+}
+function spokenNote(s){
+  return s.replace("♯"," sharp").replace("♭"," flat");
+}
+function speak(){
+  if(!target) return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(`String ${target.s.n}. ${spokenNote(target.label)}.`);
+  u.lang="en-GB"; u.rate=.88; speechSynthesis.speak(u);
+}
+function nextTarget(){
+  const max=Math.max(1,Math.min(24,+$("maxFret").value||12));
+  const s=strings[Math.floor(Math.random()*strings.length)];
+  const fret=Math.floor(Math.random()*(max+1));
+  const midi=s.midi+fret, pc=midi%12;
+  const notation=chooseNotation(), useFlat=Math.random()<.5;
+  target={s,fret,midi,notation,label:labelFor(pc,notation,useFlat)};
+  $("string").textContent=`Snaar ${s.n} · ${s.name}`;
+  $("note").textContent=target.label;
+  $("accidental").textContent=notation==="letter"?"A–G notatie":"do–si notatie";
+  $("status").textContent="Luisteren…";
+  $("status").className="status";
+  $("meter").style.width="0%";
+  stable=0; startedAt=performance.now(); speak();
+}
+function autoCorrelate(b, sr){
+  let rms=0; for(let i=0;i<b.length;i++) rms+=b[i]*b[i]; rms=Math.sqrt(rms/b.length);
+  if(rms<0.012) return -1;
+  let r1=0,r2=b.length-1,th=.2;
+  for(let i=0;i<b.length/2;i++) if(Math.abs(b[i])<th){r1=i;break}
+  for(let i=1;i<b.length/2;i++) if(Math.abs(b[b.length-i])<th){r2=b.length-i;break}
+  b=b.slice(r1,r2); const c=new Array(b.length).fill(0);
+  for(let i=0;i<b.length;i++) for(let j=0;j<b.length-i;j++) c[i]+=b[j]*b[j+i];
+  let d=0; while(c[d]>c[d+1]) d++;
+  let max=-1,pos=-1; for(let i=d;i<c.length;i++) if(c[i]>max){max=c[i];pos=i}
+  let T0=pos; if(T0<=0)return -1;
+  const x1=c[T0-1]||0,x2=c[T0],x3=c[T0+1]||0;
+  const a=(x1+x3-2*x2)/2,bv=(x3-x1)/2;
+  if(a) T0-=bv/(2*a);
+  return sr/T0;
+}
+function tick(){
+  if(!running)return;
+  analyser.getFloatTimeDomainData(buf);
+  const f=autoCorrelate(Array.from(buf),audioCtx.sampleRate);
+  if(f>0 && target){
+    // fold likely octave errors to nearest target octave before judging
+    let cf=f; while(cf<midiFreq(target.midi)/1.5) cf*=2; while(cf>midiFreq(target.midi)*1.5) cf/=2;
+    const err=Math.abs(cents(cf,target.midi)), tol=+$("tol").value;
+    if(err<=tol){
+      stable++; $("meter").style.width=Math.min(100,stable/10*100)+"%";
+      $("status").textContent=`Bijna… ${Math.round(cf)} Hz`; $("status").className="status ok";
+      if(stable>=10) correct();
+    }else{
+      stable=0;$("meter").style.width="0%";
+      $("status").textContent=`Nog niet juist · gehoord: ${Math.round(f)} Hz`; $("status").className="status bad";
+    }
+  }
+  requestAnimationFrame(tick);
+}
+function correct(){
+  const sec=(performance.now()-startedAt)/1000;
+  results.unshift({sec,target:{...target}});
+  $("status").textContent=`✓ Juist! ${sec.toFixed(1)} sec`; $("status").className="status ok";
+  renderStats();
+  target=null; stable=0;
+  setTimeout(()=>{if(running)nextTarget()},850);
+}
+function renderStats(){
+  $("count").textContent=results.length;
+  const times=results.map(x=>x.sec), avg=times.reduce((a,b)=>a+b,0)/times.length;
+  $("avg").textContent=avg.toFixed(1)+"s"; $("best").textContent=Math.min(...times).toFixed(1)+"s";
+  const f=times.filter(x=>x<3).length,m=times.filter(x=>x>=3&&x<=6).length,s=times.filter(x=>x>6).length,n=times.length;
+  $("fastN").textContent=f;$("midN").textContent=m;$("slowN").textContent=s;
+  let p1=f/n*100,p2=m/n*100,p3=s/n*100;
+  $("fastArc").setAttribute("stroke-dasharray",`${p1} ${100-p1}`);
+  $("fastArc").setAttribute("stroke-dashoffset","0");
+  $("midArc").setAttribute("stroke-dasharray",`${p2} ${100-p2}`);
+  $("midArc").setAttribute("stroke-dashoffset",`${-p1}`);
+  $("slowArc").setAttribute("stroke-dasharray",`${p3} ${100-p3}`);
+  $("slowArc").setAttribute("stroke-dashoffset",`${-(p1+p2)}`);
+  $("history").innerHTML=results.slice(0,10).map(r=>`<tr><td>Snaar ${r.target.s.n} · ${r.target.label}</td><td>${r.target.notation==="letter"?"A–G":"do–si"}</td><td>${r.sec.toFixed(1)}s</td></tr>`).join("");
+}
+$("repeat").onclick=speak;
+$("start").onclick=async()=>{
+  if(running){
+    running=false; $("start").textContent="Start training"; $("repeat").disabled=true;
+    if(stream)stream.getTracks().forEach(t=>t.stop());
+    $("status").textContent="Gepauzeerd"; return;
+  }
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const src=audioCtx.createMediaStreamSource(stream);
+    analyser=audioCtx.createAnalyser(); analyser.fftSize=4096; src.connect(analyser);
+    buf=new Float32Array(analyser.fftSize); running=true;
+    $("start").textContent="Pauze"; $("repeat").disabled=false; nextTarget(); tick();
+  }catch(e){
+    $("status").textContent="Microfoontoegang is nodig. Open de app via HTTPS en sta de microfoon toe.";
+    $("status").className="status bad";
+  }
+};
+</script>
+</body>
+</html>
