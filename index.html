@@ -53,6 +53,12 @@ small{color:var(--muted)}.pill{display:inline-block;padding:5px 9px;border-radiu
           <option value="solfege">Alleen do–si</option>
         </select>
       </label>
+      <label>Kruisen en mollen
+        <select id="accidentals">
+          <option value="on" selected>Aan (♯ en ♭)</option>
+          <option value="off">Uit (alleen natuurlijke noten)</option>
+        </select>
+      </label>
       <label>Max. fret
         <input id="maxFret" type="number" min="1" max="24" value="12">
       </label>
@@ -105,7 +111,7 @@ const sharpNames=["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"
 const flatNames =["C","D♭","D","E♭","E","F","G♭","G","A♭","A","B♭","B"];
 const solSharp=["do","do♯","re","re♯","mi","fa","fa♯","sol","sol♯","la","la♯","si"];
 const solFlat =["do","re♭","re","mi♭","mi","fa","sol♭","sol","la♭","la","si♭","si"];
-let audioCtx, analyser, buf, stream, running=false, target=null, startedAt=0, stable=0, results=[];
+let audioCtx, analyser, buf, stream, running=false, target=null, startedAt=Infinity, stable=0, results=[], speechToken=0;
 let lastNotation="solfege";
 
 const $=id=>document.getElementById(id);
@@ -123,17 +129,35 @@ function labelFor(pc, notation, useFlat){
 function spokenNote(s){
   return s.replace("♯"," sharp").replace("♭"," flat");
 }
-function speak(){
+function speak(resetTimer=false){
   if(!target) return;
+  const token=++speechToken;
+  if(resetTimer){ startedAt=Infinity; stable=0; $("meter").style.width="0%"; }
   speechSynthesis.cancel();
   const stringNames = {1:"high E",2:"B",3:"G",4:"D",5:"A",6:"low E"};
   const u=new SpeechSynthesisUtterance(`${stringNames[target.s.n]} string. ${spokenNote(target.label)}.`);
-  u.lang="en-GB"; u.rate=.88; speechSynthesis.speak(u);
+  u.lang="en-GB"; u.rate=.88;
+  if(resetTimer){
+    const beginAfterSpeech=()=>{
+      if(running && target && token===speechToken){
+        startedAt=performance.now();
+        $("status").textContent="Luisteren…";
+      }
+    };
+    u.onend=beginAfterSpeech;
+    u.onerror=beginAfterSpeech;
+  }
+  speechSynthesis.speak(u);
 }
 function nextTarget(){
   const max=Math.max(1,Math.min(24,+$("maxFret").value||12));
   const s=strings[Math.floor(Math.random()*strings.length)];
-  const fret=Math.floor(Math.random()*(max+1));
+  const allowAccidentals=$("accidentals").value==="on";
+  const possibleFrets=Array.from({length:max+1},(_,i)=>i).filter(fret=>{
+    const pc=(s.midi+fret)%12;
+    return allowAccidentals || [0,2,4,5,7,9,11].includes(pc);
+  });
+  const fret=possibleFrets[Math.floor(Math.random()*possibleFrets.length)];
   const midi=s.midi+fret, pc=midi%12;
   const notation=chooseNotation(), useFlat=Math.random()<.5;
   target={s,fret,midi,notation,label:labelFor(pc,notation,useFlat)};
@@ -143,7 +167,7 @@ function nextTarget(){
   $("status").textContent="Luisteren…";
   $("status").className="status";
   $("meter").style.width="0%";
-  stable=0; startedAt=performance.now(); speak();
+  stable=0; startedAt=Infinity; $("status").textContent="Opdracht wordt uitgesproken…"; speak(true);
 }
 function autoCorrelate(b, sr){
   let rms=0; for(let i=0;i<b.length;i++) rms+=b[i]*b[i]; rms=Math.sqrt(rms/b.length);
@@ -163,6 +187,10 @@ function autoCorrelate(b, sr){
 }
 function tick(){
   if(!running)return;
+  if(!target || !Number.isFinite(startedAt)){
+    requestAnimationFrame(tick);
+    return;
+  }
   analyser.getFloatTimeDomainData(buf);
   const f=autoCorrelate(Array.from(buf),audioCtx.sampleRate);
   if(f>0 && target){
@@ -185,7 +213,7 @@ function correct(){
   results.unshift({sec,target:{...target}});
   $("status").textContent=`✓ Juist! ${sec.toFixed(1)} sec`; $("status").className="status ok";
   renderStats();
-  target=null; stable=0;
+  target=null; stable=0; speechToken++;
   setTimeout(()=>{if(running)nextTarget()},850);
 }
 function renderStats(){
@@ -206,7 +234,7 @@ function renderStats(){
 $("repeat").onclick=speak;
 $("start").onclick=async()=>{
   if(running){
-    running=false; $("start").textContent="Start training"; $("repeat").disabled=true;
+    running=false; speechToken++; speechSynthesis.cancel(); target=null; startedAt=Infinity; $("start").textContent="Start training"; $("repeat").disabled=true;
     if(stream)stream.getTracks().forEach(t=>t.stop());
     $("status").textContent="Gepauzeerd"; return;
   }
